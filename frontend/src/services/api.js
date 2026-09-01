@@ -3,7 +3,7 @@
  * Handles network requests, AbortController timeouts, and structured error responses.
  */
 
-const API_BASE = '/api';
+const API_BASE = 'https://study-assistant-ai-oxd1.onrender.com/api';
 
 /**
  * Sends a generation request to the backend with timeout and abort signal support.
