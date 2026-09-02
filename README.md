@@ -7,6 +7,13 @@ A production-quality, two-tier web application built with **React (Vite)** and *
 
 ---
 
+## 🔗 Project Links
+
+- **Live Project:** https://study-assistant-frontend-static.onrender.com
+- **Demo Video:** https://drive.google.com/file/d/14DGSIYf60gvdTHtXxvL6dVI5V2lBPflM/view?usp=drivesdk
+
+---
+
 ## Table of Contents
 
 1. [Project Overview & Rationale](#1-project-overview--rationale)
