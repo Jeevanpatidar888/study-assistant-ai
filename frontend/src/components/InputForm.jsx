@@ -135,7 +135,7 @@ export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcar
         <button
           type="submit"
           className="generate-submit-btn"
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading}
         >
           {isLoading ? (
             <>
