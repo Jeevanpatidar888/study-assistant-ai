@@ -38,22 +38,29 @@ export default function InputForm({
 
     const trimmed = input.trim();
 
-    // Empty input or only spaces
+    // 1. Empty input or only spaces
     if (!trimmed) {
       setValidationError('Please enter a question.');
       return;
     }
 
-    // Input shorter than 3 characters
+    // 2. Only symbols / brackets / special characters
+    const hasLetterOrNumber = /[a-zA-Z0-9]/.test(trimmed);
+
+    if (!hasLetterOrNumber) {
+      setValidationError('Invalid study input.');
+      return;
+    }
+
+    // 3. Input shorter than 3 characters
     if (trimmed.length < 3) {
       setValidationError('Please enter at least 3 characters.');
       return;
     }
 
-    // Clear previous validation error
+    // 4. Valid input
     setValidationError('');
 
-    // Send valid input to parent
     onSubmit({
       mode,
       input: trimmed
@@ -233,6 +240,7 @@ export default function InputForm({
             </>
           )}
         </button>
+
       </form>
     </div>
   );
