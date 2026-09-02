@@ -28,13 +28,16 @@ export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcar
   const handleSubmit = (e) => {
     e.preventDefault();
     const trimmed = input.trim();
+    const trimmed = input.trim();
+
     if (!trimmed) {
-      setValidationError('Please enter a topic or paste notes to generate study material.');
-      return;
+        setValidationError('Please enter a question.');
+        return;
     }
+
     if (trimmed.length < 3) {
-      setValidationError('Please enter at least 3 characters.');
-      return;
+        setValidationError('Please enter at least 3 characters.');
+        return;
     }
     setValidationError('');
     onSubmit({ mode, input: trimmed });
