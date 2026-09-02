@@ -1,25 +1,87 @@
-﻿import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 /**
  * Service to interact with the Gemini API.
- * Formulates strict structured JSON prompts and requests structured output.
+ * Generates either study material or an invalid-input response.
  */
 
-// Initialize GoogleGenAI client if API key is present
-const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : '';
+const apiKey = process.env.GEMINI_API_KEY
+  ? process.env.GEMINI_API_KEY.trim()
+  : '';
+
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 /**
- * Builds the strict prompt and instructions for the Gemini model.
- * @param {'flashcards' | 'quiz'} mode 
- * @param {string} input 
+ * Builds the prompt for Gemini.
+ *
+ * Important:
+ * The examples are only examples.
+ * Do NOT hard-code a small list of invalid questions.
+ * Gemini must determine whether the user's request is study-related.
+ *
+ * @param {'flashcards' | 'quiz'} mode
+ * @param {string} input
  * @returns {{ prompt: string, systemInstruction: string }}
  */
 function buildPrompt(mode, input) {
+  const systemInstruction = `
+You are a strict Study Assistant.
+
+Your first responsibility is to determine whether the user's request is related to studying, learning, education, academics, programming, computer science, mathematics, science, technology, exam preparation, or another educational topic.
+
+IMPORTANT:
+- Do NOT use a fixed list of invalid questions.
+- The examples below are ONLY examples.
+- You must classify ANY unrelated request as invalid, even if it is a completely new question that was not listed in the examples.
+- Do not answer unrelated questions.
+
+Examples of unrelated requests include:
+- asking about politics or political leaders as general information
+- asking for travel recommendations
+- asking about restaurants or entertainment
+- asking for shopping recommendations
+- asking about celebrities
+- asking for personal advice unrelated to education
+- asking for weather information
+- asking general questions that have no educational/study purpose
+
+However, a normally general topic IS VALID if the user clearly asks for it for educational purposes.
+
+For example:
+"Explain the French Revolution for my history exam."
+=> VALID
+
+"Explain how the Indian government works for my civics class."
+=> VALID
+
+"Who is the Prime Minister?"
+=> INVALID
+
+"Which city should I visit?"
+=> INVALID
+
+If the request is NOT study-related, return ONLY this JSON:
+
+{
+  "type": "invalid_input",
+  "message": "This is not a valid study-related question. Please ask something related to your studies."
+}
+
+If the request IS study-related, generate the requested study material.
+
+Never answer an invalid request with actual information.
+
+Never add markdown fences.
+Never add explanations outside JSON.
+Always return valid JSON.
+`;
+
   if (mode === 'flashcards') {
     return {
-      systemInstruction: `You are an expert study assistant. Your job is to transform study notes or topics into high-yield, active recall flashcards.
-You MUST output ONLY a valid JSON object matching this EXACT schema:
+      systemInstruction: `${systemInstruction}
+
+For a valid study-related request, return EXACTLY this schema:
+
 {
   "type": "flashcards",
   "title": "Clear concise title of the study topic",
@@ -31,18 +93,31 @@ You MUST output ONLY a valid JSON object matching this EXACT schema:
     }
   ]
 }
-Rules:
-1. Do not include markdown code fences, comments, or introductory/concluding text.
-2. Return between 4 and 8 high-quality cards covering the most essential concepts.
-3. Every card must have a unique non-empty string "id", a "question", and an "answer".`,
-      prompt: `Generate a study flashcard deck based on the following topic or notes:
-${input}`
+
+Rules for flashcards:
+1. Generate between 4 and 8 cards.
+2. Every card must have a unique non-empty string id.
+3. Every card must contain question and answer.
+4. Cover the most important concepts.
+5. Keep questions focused and useful for learning.`,
+      prompt: `
+Determine whether this request is study-related.
+
+If it is unrelated, return the invalid_input JSON.
+
+If it is study-related, generate flashcards.
+
+USER REQUEST:
+${input}
+`
     };
   }
 
   return {
-    systemInstruction: `You are an expert study assistant and test designer. Your job is to transform study notes or topics into a diagnostic multiple-choice quiz.
-You MUST output ONLY a valid JSON object matching this EXACT schema:
+    systemInstruction: `${systemInstruction}
+
+For a valid study-related request, return EXACTLY this schema:
+
 {
   "type": "quiz",
   "title": "Clear concise title of the quiz",
@@ -57,30 +132,37 @@ You MUST output ONLY a valid JSON object matching this EXACT schema:
         "Choice D text"
       ],
       "correctAnswer": "Choice A text",
-      "explanation": "Clear explanation of why this answer is correct and why other choices are misconceptions."
+      "explanation": "Clear explanation of why this answer is correct."
     }
   ]
 }
-Rules:
-1. Do not include markdown code fences, comments, or introductory/concluding text.
-2. Generate between 3 and 6 multiple-choice questions.
-3. Each question must have 4 distinct, plausible options.
-4. "correctAnswer" MUST be an EXACT string match to one of the choices in the "options" array.
-5. Provide a helpful, educational explanation for each question.`,
-    prompt: `Generate a multiple-choice quiz based on the following topic or notes:
-${input}`
+
+Rules for quiz:
+1. Generate between 3 and 6 questions.
+2. Every question must have exactly 4 distinct options.
+3. Options must be plausible.
+4. correctAnswer MUST exactly match one option.
+5. Provide an educational explanation.
+6. Cover important concepts from the requested topic.`,
+    prompt: `
+Determine whether this request is study-related.
+
+If it is unrelated, return the invalid_input JSON.
+
+If it is study-related, generate a multiple-choice quiz.
+
+USER REQUEST:
+${input}
+`
   };
 }
 
 /**
- * Generates intelligent fallback study data when GEMINI_API_KEY is not configured.
- * This guarantees evaluators can run and test the complete application immediately out-of-the-box.
- * @param {'flashcards' | 'quiz'} mode 
- * @param {string} input 
- * @returns {object}
+ * Demo fallback when Gemini API key is not configured.
  */
 function generateDemoData(mode, input) {
-  const cleanTopic = input.length > 50 ? input.slice(0, 47) + '...' : input;
+  const cleanTopic =
+    input.length > 50 ? input.slice(0, 47) + '...' : input;
 
   if (mode === 'flashcards') {
     return {
@@ -90,22 +172,26 @@ function generateDemoData(mode, input) {
         {
           id: '1',
           question: `What is the core principle behind ${cleanTopic}?`,
-          answer: `${cleanTopic} emphasizes modularity, separation of concerns, and predictability to produce reliable outcomes under varied operational constraints.`
+          answer:
+            `${cleanTopic} emphasizes understanding core concepts, structure, and practical application.`
         },
         {
           id: '2',
-          question: `What is the primary advantage of active recall over passive review?`,
-          answer: `Active recall stimulates memory retrieval and strengthens neural pathways, leading to significantly higher long-term retention compared to passively re-reading text.`
+          question: `Why is understanding ${cleanTopic} important?`,
+          answer:
+            `Understanding the fundamentals helps you apply the concept correctly and solve related problems.`
         },
         {
           id: '3',
-          question: `How should edge cases and unexpected inputs be handled in this domain?`,
-          answer: `By establishing clear boundary contracts, validating incoming payloads at ingress points, and adopting graceful failure fallbacks that prevent system crashes.`
+          question: `What is an important concept related to ${cleanTopic}?`,
+          answer:
+            `Important concepts should be understood through definitions, examples, use cases, and edge cases.`
         },
         {
           id: '4',
-          question: `What trade-off typically exists between performance optimization and code maintainability?`,
-          answer: `Premature or aggressive optimization can introduce cognitive complexity and tight coupling, whereas readable, idiomatic implementations are easier to test and adapt.`
+          question: `How can you practice ${cleanTopic}?`,
+          answer:
+            `You can practice it by studying examples, solving problems, and testing your understanding with active recall.`
         }
       ]
     };
@@ -117,39 +203,44 @@ function generateDemoData(mode, input) {
     questions: [
       {
         id: '1',
-        question: `Which of the following best describes the foundational objective of ${cleanTopic}?`,
+        question: `Which approach is most useful for understanding ${cleanTopic}?`,
         options: [
-          `To structure processes and data cleanly for dependable and scalable results.`,
-          `To eliminate the need for systematic testing and verification.`,
-          `To prioritize unstructured iteration without defined boundaries.`,
-          `To enforce monolithic design patterns across all components.`
+          'Understand the fundamentals and practice examples.',
+          'Avoid studying the basic concepts.',
+          'Only memorize unrelated information.',
+          'Never test your understanding.'
         ],
-        correctAnswer: `To structure processes and data cleanly for dependable and scalable results.`,
-        explanation: `A well-structured design provides reliability, predictability, and simplifies maintenance as requirements evolve.`
+        correctAnswer:
+          'Understand the fundamentals and practice examples.',
+        explanation:
+          'Understanding fundamentals and practicing examples helps build strong conceptual knowledge.'
       },
       {
         id: '2',
-        question: `When handling external or unpredictable data in web applications, what is the best practice?`,
+        question: `What is a good way to improve your knowledge of ${cleanTopic}?`,
         options: [
-          `Parse and strictly validate against a known schema before rendering or processing.`,
-          `Render raw text directly without sanitization or validation.`,
-          `Trust that upstream producers always adhere to the correct data contract.`,
-          `Suppress all errors silently and continue execution regardless of state.`
+          'Practice problems and active recall.',
+          'Avoid reviewing mistakes.',
+          'Only read the topic once.',
+          'Ignore practical examples.'
         ],
-        correctAnswer: `Parse and strictly validate against a known schema before rendering or processing.`,
-        explanation: `Validating data boundaries prevents runtime crashes, injection vulnerabilities, and broken component states.`
+        correctAnswer: 'Practice problems and active recall.',
+        explanation:
+          'Practice and active recall improve understanding and long-term retention.'
       },
       {
         id: '3',
-        question: `What is the primary purpose of an AbortController in asynchronous HTTP request handling?`,
+        question: `What should you do when learning a difficult concept?`,
         options: [
-          `To cancel stale or superseded in-flight network requests and prevent race conditions.`,
-          `To automatically restart failed network requests in an infinite retry loop.`,
-          `To encrypt outgoing HTTP payloads before transmission.`,
-          `To cache responses in localStorage permanently.`
+          'Break it into smaller concepts and practice them.',
+          'Stop studying immediately.',
+          'Ignore the difficult parts.',
+          'Memorize random information.'
         ],
-        correctAnswer: `To cancel stale or superseded in-flight network requests and prevent race conditions.`,
-        explanation: `AbortController allows cancellation of active fetch requests so that delayed responses from previous user actions cannot overwrite newer UI state.`
+        correctAnswer:
+          'Break it into smaller concepts and practice them.',
+        explanation:
+          'Breaking complex concepts into smaller parts makes them easier to understand and apply.'
       }
     ]
   };
@@ -157,22 +248,34 @@ function generateDemoData(mode, input) {
 
 /**
  * Main service call to generate study content.
- * @param {'flashcards' | 'quiz'} mode 
- * @param {string} input 
- * @returns {Promise<string>} Raw text string from model (or stringified demo JSON)
+ *
+ * @param {'flashcards' | 'quiz'} mode
+ * @param {string} input
+ * @returns {Promise<string>}
  */
 export async function generateContentFromGemini(mode, input) {
-  // If API key is missing, return high-fidelity demo data so reviewer isn't blocked
+  // Gemini API key is required for intelligent
+  // study/non-study classification.
   if (!ai) {
-    console.warn('[GeminiService] GEMINI_API_KEY not configured in backend/.env. Returning intelligent demo kit.');
-    return JSON.stringify(generateDemoData(mode, input));
+    console.warn(
+      '[GeminiService] GEMINI_API_KEY is not configured.'
+    );
+
+    // IMPORTANT:
+    // Without Gemini we cannot reliably determine whether
+    // an arbitrary question is study-related.
+    // Therefore we return a clear configuration error instead
+    // of accidentally answering unrelated questions.
+    throw new Error(
+      'GEMINI_API_KEY is not configured. Please configure the Gemini API key.'
+    );
   }
 
   const { prompt, systemInstruction } = buildPrompt(mode, input);
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
         systemInstruction,
@@ -182,13 +285,18 @@ export async function generateContentFromGemini(mode, input) {
     });
 
     if (!response || !response.text) {
-      throw new Error('Gemini API returned an empty response text.');
+      throw new Error(
+        'Gemini API returned an empty response text.'
+      );
     }
 
     return response.text;
   } catch (error) {
-    // If quota exceeded or invalid key, provide informative error or demo fallback
-    console.error('[GeminiService] Error calling Gemini API:', error.message);
+    console.error(
+      '[GeminiService] Error calling Gemini API:',
+      error.message
+    );
+
     throw error;
   }
 }
