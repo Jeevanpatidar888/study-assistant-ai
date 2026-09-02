@@ -1,9 +1,9 @@
-﻿# StudySphere AI — Interactive AI Study Assistant
+# StudySphere AI — Interactive AI Study Assistant
 
 A production-quality, two-tier web application built with **React (Vite)** and **Node.js (Express)** that transforms free-form notes and topics into structured, interactive study materials: **3D Active Recall Flashcards** and a **Diagnostic Multiple-Choice Quiz with Wrong-Answer Re-testing**.
 
 > **Evaluation Focus**: Frontend Software Engineering Internship Assignment  
-> **Key Principle**: **No Chatbot**. The application strictly rejects chat bubbles and unstructured text streams. It requests, validates, and renders pure structured JSON contracts as rich, stateful interactive components.
+> **Key Principle**: **No Chatbot**. The application does not use chat bubbles or unstructured text streams. It requests, validates, and renders structured JSON contracts as rich, stateful interactive components.
 
 ---
 
@@ -20,7 +20,7 @@ A production-quality, two-tier web application built with **React (Vite)** and *
 9. [How to Run the Frontend](#9-how-to-run-the-frontend)
 10. [Example API Payloads](#10-example-api-payloads)
 11. [AI Output Strict JSON Schemas](#11-ai-output-strict-json-schemas)
-12. [13-Point Failure Handling Strategy](#12-13-point-failure-handling-strategy)
+12. [14-Point Failure Handling Strategy](#12-14-point-failure-handling-strategy)
 13. [Stale Response & Race Condition Protection](#13-stale-response--race-condition-protection)
 14. [Security Considerations](#14-security-considerations)
 15. [Automated Testing](#15-automated-testing)
@@ -32,57 +32,71 @@ A production-quality, two-tier web application built with **React (Vite)** and *
 
 ## 1. Project Overview & Rationale
 
-Most AI interfaces default to conversational chatbots. While great for open dialogue, chatbots are suboptimal for systematic studying because:
-- They bury core facts in verbose narrative fluff.
-- They lack structured progress tracking, active recall mechanics, and quantifiable performance metrics.
-- They cannot be easily navigated via keyboard shortcuts or drilled repeatedly.
+Most AI interfaces default to conversational chatbots. While useful for open dialogue, chatbots are suboptimal for systematic studying because:
+
+- They bury core facts in verbose narrative responses.
+- They lack structured study interactions and measurable performance feedback.
+- They are not optimized for active recall and repeated practice.
 
 **StudySphere AI** solves this by enforcing an architectural boundary between AI generation and component rendering:
-- The user provides topic notes and selects their learning mode (`flashcards` or `quiz`).
-- The backend prompts Gemini with strict JSON schemas using `@google/genai`.
-- A dedicated parsing barrier inspects, strips fences, parses, and validates the shape.
-- The React frontend renders validated data using interactive components.
+
+- The user provides a study-related topic or notes and selects a learning mode (`flashcards` or `quiz`).
+- The backend prompts Gemini using strict output instructions through `@google/genai`.
+- The backend parses and validates the AI response before it reaches the frontend.
+- Unrelated/non-study requests are rejected with a structured `invalid_input` response.
+- The React frontend renders only validated structured data using interactive components.
 
 ---
 
 ## 2. Key Features
 
 ### 🎴 Flashcard Mode
+
 - **3D Flip Cards**: Smooth CSS perspective flips between Question (front) and Answer (back).
-- **Session Pagination**: Previous/Next controls, direct card counter, and progress bar.
+- **Session Pagination**: Previous/Next controls, card counter, and progress bar.
 - **Card Mastery**: Mark individual cards as mastered.
-- **Deck Shuffling & Restart**: Instant card randomization and session restarts.
-- **Keyboard Shortcuts**: Navigate cards with Left/Right arrow keys; flip with Space or Enter.
+- **Deck Shuffling & Restart**: Randomize cards and restart the study session.
+- **Keyboard Shortcuts**: Navigate cards with Left/Right arrow keys and flip with Space or Enter.
 
 ### 📝 Quiz Mode
-- **Diagnostic Multiple-Choice**: 4 plausible options with clean selection states.
-- **Immediate Visual Feedback**: Green/Red indicator styling upon submission.
-- **In-Depth Explanations**: Contextual breakdown explaining why the correct answer is right and why distractors are misconceptions.
-- **Quantifiable Score Metric**: Final percentage score, breakdown tags (Correct vs. Incorrect), and qualitative feedback tier.
-- **Wrong-Answer Re-testing**: Single-click focus drill that filters the quiz to re-test *only* the questions missed in the initial run.
+
+- **Multiple-Choice Quiz**: Each generated question contains exactly 4 options.
+- **Immediate Visual Feedback**: Visual feedback is provided after answer submission.
+- **In-Depth Explanations**: Each question includes an explanation for the correct answer.
+- **Quantifiable Score Metric**: Final score and performance feedback are displayed.
+- **Wrong-Answer Re-testing**: Users can focus on questions they answered incorrectly.
+
+### 🛡️ Input & AI Safety Handling
+
+- Study-related requests are processed normally.
+- Clearly unrelated requests are rejected with:
+  `This is not a valid study-related question. Please ask something related to your studies.`
+- The system is designed to handle arbitrary unrelated requests rather than relying on a fixed hard-coded list.
+- General topics can be accepted when the user clearly provides an educational/study context.
 
 ---
 
 ## 3. System Architecture & Data Flow
 
-```
+```text
 [ User Input (Topic/Notes + Mode) ]
                │
                ▼
    [ React Frontend (Port 3000) ]
-        ├── AbortController (Cancels superseded requests)
-        └── Sequential requestIdRef Guard
+        ├── Loading / Error / Empty States
+        ├── AbortController
+        └── requestIdRef Stale Response Guard
                │
-      HTTP POST /api/generate (proxied)
+      HTTP POST /api/generate
                │
                ▼
    [ Node/Express Backend (Port 5000) ]
-        ├── Request validation (mode, input length)
-        ├── Gemini Service (@google/genai + gemini-2.5-flash)
-        └── validateResponse.js (Strict JSON Schema Barrier)
+        ├── Request validation
+        ├── Gemini Service (@google/genai + gemini-3.6-flash)
+        └── validateResponse.js
                │
                ▼
-[ Validated Structured JSON Payload ]
+ [ Validated Structured JSON Payload ]
                │
                ▼
    [ Interactive UI Components ]
@@ -90,57 +104,69 @@ Most AI interfaces default to conversational chatbots. While great for open dial
         └── Quiz / QuizQuestion / Score Screen
 ```
 
+### Request Flow
+
+1. The user selects `flashcards` or `quiz`.
+2. The frontend validates the input and sends a POST request to `/api/generate`.
+3. The backend validates the request.
+4. Gemini receives strict instructions for either valid study content or an `invalid_input` response.
+5. The backend parses and validates the returned JSON.
+6. Invalid or malformed AI output is rejected before reaching the frontend.
+7. Valid structured data is returned to React.
+8. React renders the corresponding interactive study component.
+
 ---
 
 ## 4. Project Directory Structure
 
-```
+```text
 study-assistant-ai/
 ├── frontend/
 │   ├── public/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── EmptyState.jsx       # Welcome prompt & sample starter topics
-│   │   │   ├── ErrorState.jsx       # User-facing error message with 1-click retry
-│   │   │   ├── Flashcard.jsx        # 3D interactive flip card with active recall hints
-│   │   │   ├── FlashcardDeck.jsx    # Pagination, keyboard shortcuts, shuffling, progress
-│   │   │   ├── InputForm.jsx        # Free-form topic/notes input & mode toggle
-│   │   │   ├── LoadingState.jsx     # Pulse animation and skeleton preview
-│   │   │   ├── ProgressBar.jsx      # Accessible step progress tracker (ARIA)
-│   │   │   ├── Quiz.jsx             # Quiz manager, score metrics, wrong-answer drill
-│   │   │   └── QuizQuestion.jsx     # Multiple choice options & instant explanations
+│   │   │   ├── EmptyState.jsx
+│   │   │   ├── ErrorState.jsx
+│   │   │   ├── Flashcard.jsx
+│   │   │   ├── FlashcardDeck.jsx
+│   │   │   ├── InputForm.jsx
+│   │   │   ├── LoadingState.jsx
+│   │   │   ├── ProgressBar.jsx
+│   │   │   ├── Quiz.jsx
+│   │   │   └── QuizQuestion.jsx
 │   │   ├── services/
-│   │   │   └── api.js               # Frontend API client with AbortController & timeouts
-│   │   ├── App.jsx                  # Root state coordinator & stale response guard
-│   │   ├── App.css                  # Custom design system & 3D CSS perspective
-│   │   └── main.jsx                 # Vite application entrypoint
+│   │   │   └── api.js
+│   │   ├── App.jsx
+│   │   ├── App.css
+│   │   └── main.jsx
 │   ├── index.html
-│   ├── vite.config.js               # Port 3000 config + /api proxy to backend
+│   ├── vite.config.js
 │   └── package.json
 │
 ├── backend/
 │   ├── routes/
-│   │   └── generate.js              # POST /api/generate endpoint handler
+│   │   └── generate.js
 │   ├── services/
-│   │   └── geminiService.js         # Gemini API prompt builder & demo engine fallback
+│   │   └── geminiService.js
 │   ├── utils/
-│   │   └── validateResponse.js      # Robust JSON parser, fence stripper, schema validator
+│   │   └── validateResponse.js
 │   ├── tests/
-│   │   └── validateResponse.test.js # Automated unit tests for validation & edge cases
-│   ├── server.js                    # Express app, CORS, error handling middleware
-│   ├── package.json                 # Express, @google/genai, dotenv, cors
-│   └── .env.example                 # GEMINI_API_KEY=, PORT=5000
+│   │   └── validateResponse.test.js
+│   ├── server.js
+│   ├── package.json
+│   └── .env.example
 │
-├── .gitignore                       # node_modules, .env, dist, logs, OS files
-└── README.md                        # Assignment documentation
+├── .gitignore
+└── README.md
 ```
 
 ---
 
 ## 5. Prerequisites
 
-- **Node.js**: `v18.0.0` or higher (tested on `v24.14.1`)
-- **npm**: `v9.0.0` or higher (tested on `v11.11.0`)
+- **Node.js**: `v18.0.0` or higher
+- **npm**: `v9.0.0` or higher
+- A valid **Google Gemini API key**
 
 ---
 
@@ -162,20 +188,16 @@ npm install
 
 ## 7. Environment Variables
 
-In `study-assistant-ai/backend`, copy `.env.example` to `.env`:
+In `study-assistant-ai/backend`, create a `.env` file based on `.env.example`.
 
-```bash
-cd study-assistant-ai/backend
-cp .env.example .env
-```
-
-Edit `backend/.env`:
 ```env
 PORT=5000
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-> **Reviewer Convenience Note**: If `GEMINI_API_KEY` is not set, the backend runs an **intelligent demo fallback engine**. This allows evaluators to run and test the complete application without configuring an API key. Once a valid key is provided, it automatically connects to Google's `gemini-2.5-flash` model.
+The Gemini API key is kept on the backend and is never exposed to the React frontend.
+
+The application uses the `gemini-3.6-flash` model through the `@google/genai` package.
 
 ---
 
@@ -185,9 +207,15 @@ GEMINI_API_KEY=your_gemini_api_key_here
 cd study-assistant-ai/backend
 npm start
 ```
-*Runs on `http://localhost:5000`*.
+
+The backend runs on:
+
+```text
+http://localhost:5000
+```
 
 For development with hot-reloading:
+
 ```bash
 npm run dev
 ```
@@ -200,12 +228,20 @@ npm run dev
 cd study-assistant-ai/frontend
 npm run dev
 ```
-*Opens on `http://localhost:3000` with automated proxying to the backend on port 5000*.
 
-To create an optimized production build:
+The Vite development server runs on:
+
+```text
+http://localhost:3000
+```
+
+For a production build:
+
 ```bash
 npm run build
 ```
+
+The frontend communicates with the configured backend API.
 
 ---
 
@@ -213,12 +249,14 @@ npm run build
 
 ### POST `/api/generate`
 
-**Request Headers:**
+### Request Headers
+
 ```http
 Content-Type: application/json
 ```
 
-**Request Body (Flashcards):**
+### Request Body — Flashcards
+
 ```json
 {
   "mode": "flashcards",
@@ -226,7 +264,8 @@ Content-Type: application/json
 }
 ```
 
-**Request Body (Quiz):**
+### Request Body — Quiz
+
 ```json
 {
   "mode": "quiz",
@@ -234,20 +273,37 @@ Content-Type: application/json
 }
 ```
 
-**Successful Response Body (Flashcards):**
+### Successful Flashcard Response
+
+> Example shortened for readability; production validation requires 4–8 flashcards.
+
 ```json
 {
   "success": true,
   "data": {
     "type": "flashcards",
-    "title": "Study Deck: React hooks",
+    "title": "Study Deck: React Hooks",
     "cards": [
       {
         "id": "1",
-        "question": "What is the purpose of useEffect dependency array?",
-        "answer": "It controls when the effect executes; omitting it runs on every render, an empty array runs once on mount, and listing values reruns when those values change."
+        "question": "What is the purpose of the useEffect dependency array?",
+        "answer": "It controls when the effect executes based on dependency changes."
       }
     ]
+  }
+}
+```
+
+### Invalid Study Input Response
+
+For an unrelated request, the backend can return:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_STUDY_INPUT",
+    "message": "This is not a valid study-related question. Please ask something related to your studies."
   }
 }
 ```
@@ -257,6 +313,9 @@ Content-Type: application/json
 ## 11. AI Output Strict JSON Schemas
 
 ### Flashcards Schema
+
+The validator requires between **4 and 8 flashcards**.
+
 ```json
 {
   "type": "flashcards",
@@ -272,6 +331,11 @@ Content-Type: application/json
 ```
 
 ### Quiz Schema
+
+The validator requires between **3 and 6 questions**.
+
+Each question must contain exactly **4 unique options**, a matching `correctAnswer`, and a non-empty `explanation`.
+
 ```json
 {
   "type": "quiz",
@@ -280,7 +344,12 @@ Content-Type: application/json
     {
       "id": "string (non-empty)",
       "question": "string (non-empty)",
-      "options": ["string", "string", "string", "string"],
+      "options": [
+        "string",
+        "string",
+        "string",
+        "string"
+      ],
       "correctAnswer": "string (must match one entry in options)",
       "explanation": "string (non-empty)"
     }
@@ -288,89 +357,134 @@ Content-Type: application/json
 }
 ```
 
+### Invalid Input Schema
+
+```json
+{
+  "type": "invalid_input",
+  "message": "This is not a valid study-related question. Please ask something related to your studies."
+}
+```
+
 ---
 
-## 12. 13-Point Failure Handling Strategy
+## 12. 14-Point Failure Handling Strategy
 
-The system is designed so that unexpected AI output or network volatility will **never crash the UI**:
+The system is designed so that unexpected AI output, invalid input, or network problems are handled without crashing the UI.
 
 | # | Failure Mode | Protection Mechanism | User Experience |
 |---|---|---|---|
-| 1 | **Empty user input** | Frontend and backend validate string emptiness before any network call. | Inline input validation message. |
-| 2 | **Input under 3 chars** | Backend rejects with HTTP 400 (`INPUT_TOO_SHORT`). | User-friendly prompt to enter more detail. |
-| 3 | **Gemini API authentication error** | Backend catches 401/403 and maps to HTTP 502 (`AI_SERVICE_AUTHENTICATION`). | ErrorState card with troubleshooting steps. |
-| 4 | **Gemini rate limits (429)** | Backend maps rate limits to HTTP 429 (`AI_RATE_LIMIT`). | Prompts user to retry shortly. |
-| 5 | **Network failure / Backend down** | Frontend `api.js` catches fetch rejections and maps to `NETWORK_ERROR`. | Informs user that backend on port 5000 is unreachable. |
-| 6 | **Slow response / Timeout** | `AbortController` triggers after 30 seconds timeout. | Prompts user to retry without hanging indefinitely. |
-| 7 | **Markdown-wrapped JSON** | `cleanRawText()` regex removes ```` ```json ```` and trailing fences. | Transparently parsed into clean JSON. |
-| 8 | **Malformed / Truncated JSON syntax** | `JSON.parse` wrapped in try/catch; returns HTTP 502 with error details. | UI catches error, prevents crash, offers Retry button. |
-| 9 | **Wrong JSON shape / Wrong type** | Schema validator asserts `data.type === mode`. | Rejects mismatched shape before reaching client. |
-| 10 | **Missing required fields** | Validates every card (`question`, `answer`) and question (`options`, `correctAnswer`). | Prevents undefined property access in UI components. |
-| 11 | **Invalid quiz options** | Checks `options.length >= 2` and asserts choices are non-empty. | Guarantees all rendered questions have valid choices. |
-| 12 | **Quiz correctAnswer mismatch** | Confirms `correctAnswer` is present in the `options` array. | Prevents unwinnable questions with missing answers. |
-| 13 | **Malformed JSON in request body** | Express error middleware intercepts bad request syntax before route execution. | Returns structured HTTP 400 instead of generic 500 HTML. |
+| 1 | **Empty user input** | Frontend/backend input validation | Inline validation message |
+| 2 | **Input under 3 characters** | Backend rejects with `INPUT_TOO_SHORT` | User is asked to provide more detail |
+| 3 | **Unrelated/non-study request** | Gemini classifies the request and returns `invalid_input` | User sees the study-related input message |
+| 4 | **Gemini authentication error** | Backend maps authentication failures to a structured error | User sees a retry-friendly error |
+| 5 | **Gemini rate limit** | Backend maps rate-limit failures to `AI_RATE_LIMIT` | User is asked to retry later |
+| 6 | **Network failure / Backend unavailable** | Frontend maps connection failures to `NETWORK_ERROR` | User sees a connection error |
+| 7 | **Slow response / Timeout** | Frontend `AbortController` timeout after 30 seconds | User can retry instead of waiting indefinitely |
+| 8 | **Markdown-wrapped JSON** | `cleanRawText()` removes JSON code fences | Valid JSON is parsed normally |
+| 9 | **Malformed / truncated JSON** | `JSON.parse()` is protected with `try/catch` | Error is shown with Retry option |
+| 10 | **Wrong JSON shape/type** | Schema validator checks the expected structure and type | Invalid AI output is rejected |
+| 11 | **Missing required fields** | Cards and quiz questions are strictly validated | Invalid data never reaches UI components |
+| 12 | **Invalid quiz options/correct answer** | Exactly 4 options, duplicate checks, and answer matching | Invalid questions are rejected |
+| 13 | **Malformed JSON in request body** | Express error middleware handles invalid request syntax | Structured HTTP 400 response |
+| 14 | **Stale response / race condition** | `AbortController` + `requestIdRef` | Older responses cannot overwrite newer results |
 
 ---
 
 ## 13. Stale Response & Race Condition Protection
 
-When a user triggers multiple generation requests in rapid succession (e.g. submitting a topic, changing mind, and submitting another), network arrival order cannot be guaranteed. A slower, older request might resolve *after* a newer one, causing stale data to overwrite the UI.
+When multiple generation requests are triggered quickly, network responses may arrive in a different order from the order in which requests were started.
 
-**StudySphere AI employs a two-tier race condition guard**:
-1. **Active Abort via `AbortController`**: When a new request starts, `abortControllerRef.current.abort('SUPERSEDED_BY_NEW_REQUEST')` terminates the in-flight HTTP connection immediately.
-2. **Sequential `requestIdRef` Counter**: An incrementing counter ensures that even if an aborted response arrives during cleanup, it is discarded because `thisRequestId !== requestIdRef.current`.
+For example:
+
+```text
+Request #1 → slow response
+Request #2 → fast response
+```
+
+Without protection, Request #1 could overwrite the newer result from Request #2.
+
+**StudySphere AI uses two layers of protection:**
+
+1. **AbortController**
+
+   When a new request starts, the previous in-flight request is aborted.
+
+2. **Sequential `requestIdRef`**
+
+   Every request receives a unique sequential request ID. Before updating the UI, the response is checked against the latest request ID.
+
+   If the response belongs to an older request, it is discarded.
+
+This ensures stale responses cannot overwrite newer study results.
 
 ---
 
 ## 14. Security Considerations
 
-- **No API Keys in Frontend**: The React client has zero knowledge of `GEMINI_API_KEY`. It communicates exclusively with `/api/generate`.
-- **Backend Environment Isolation**: `GEMINI_API_KEY` is loaded securely on the Node.js server via `dotenv`.
-- **Git Protection**: `.env` is explicitly included in root `.gitignore`.
-- **CORS Restriction**: Explicit origin headers prevent unauthorized cross-domain exploitation.
-- **Input Sanitization & Length Limits**: Request payloads are limited to 5MB and input strings are trimmed and validated.
+- **No API Key in Frontend**: `GEMINI_API_KEY` is stored only on the backend.
+- **Backend Environment Isolation**: Environment variables are loaded through `dotenv`.
+- **Git Protection**: `.env` is excluded through `.gitignore`.
+- **Backend API Boundary**: The frontend communicates with Gemini indirectly through the backend API.
+- **CORS Handling**: The backend enables CORS so the separately deployed frontend can call the API. For a stricter production deployment, the allowed origin can be restricted to the frontend domain.
+- **Input Validation**: Request mode and input length are validated before generation.
 
 ---
 
 ## 15. Automated Testing
 
-The backend includes an automated unit test suite testing parsing and schema validation rules:
+The backend includes unit tests for response parsing and schema validation.
+
+Run:
 
 ```bash
 cd study-assistant-ai/backend
 npm test
 ```
 
-### Test Coverage:
-- `cleanRawText` removes markdown code fences (` ```json `).
-- `cleanRawText` handles clean JSON without fences.
-- `validateFlashcards` accepts valid flashcard objects.
-- `validateFlashcards` rejects mismatched types, empty cards, or missing fields.
-- `validateQuiz` accepts conforming multiple-choice quizzes.
-- `validateQuiz` rejects `correctAnswer` values not found in `options`.
-- `validateResponse` handles full markdown-wrapped JSON payloads.
-- `validateResponse` rejects broken JSON syntax with descriptive error messages.
-- `validateResponse` rejects empty or whitespace strings.
+### Test Coverage
+
+- `cleanRawText` removes Markdown JSON fences.
+- Clean JSON responses are parsed successfully.
+- Valid flashcard objects are accepted.
+- Invalid flashcard types are rejected.
+- Missing flashcard fields are rejected.
+- Flashcard count outside the allowed range is rejected.
+- Valid quiz objects are accepted.
+- Quiz questions with invalid option counts are rejected.
+- Duplicate quiz options are rejected.
+- `correctAnswer` values not found in `options` are rejected.
+- Missing quiz explanations are rejected.
+- Markdown-wrapped JSON is validated correctly.
+- Broken JSON syntax is rejected.
+- Empty or whitespace AI responses are rejected.
+- `invalid_input` responses are validated correctly.
 
 ---
 
 ## 16. Known Limitations
 
-- **Single Generation Scope**: The application focuses on single-topic generation rather than persistent user accounts with cloud database sync.
-- **Free-Tier Rate Limits**: Gemini API free tier may experience rate limits (15 RPM) during high traffic; the app gracefully reports this via `AI_RATE_LIMIT`.
-- **Model Output Length**: Notes exceeding 10,000 words should be chunked to avoid hitting context output limits.
+- **Single Generation Scope**: The application focuses on generating study material for the current session rather than persistent user accounts and cloud synchronization.
+- **Gemini Dependency**: Generation and semantic study-topic classification depend on the Gemini API.
+- **API Rate Limits**: Gemini API usage may be subject to provider rate limits.
+- **Model Classification Is Probabilistic**: Unrelated-input detection is performed through the AI model, so it is designed as a practical classification layer rather than an absolute mathematical guarantee.
+- **Large Inputs**: Very large study notes may need to be split into smaller sections depending on model/context limits.
 
 ---
 
 ## 17. AI Usage Disclosure
 
-In compliance with assignment requirements, AI coding assistance (Antigravity with Google Gemini) was utilized during the development of this project for:
-- Formulating the initial two-tier folder structure and build configuration.
-- Refining the prompt engineering system instructions for `@google/genai`.
-- Constructing edge-case unit test scenarios for schema validation.
-- Crafting CSS 3D perspective animations for flashcard flipping.
+In compliance with assignment requirements, AI coding assistance was used during development.
 
-All code, architectural patterns, state machines, and failure handling mechanisms were systematically tested, reviewed, and verified.
+AI assistance was used for:
+
+- Refining the two-tier project structure and configuration.
+- Improving Gemini prompt instructions and structured JSON output requirements.
+- Designing edge-case scenarios for response validation.
+- Reviewing error-handling and race-condition scenarios.
+- Assisting with CSS 3D perspective animations and UI implementation.
+
+The generated suggestions were reviewed, integrated, tested, and adapted as part of the final implementation.
 
 ---
 
