@@ -1,11 +1,11 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  RotateCcw, 
-  Shuffle, 
-  Check, 
-  Layers 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Shuffle,
+  Check,
+  Layers
 } from 'lucide-react';
 import Flashcard from './Flashcard.jsx';
 import ProgressBar from './ProgressBar.jsx';
@@ -13,12 +13,14 @@ import ProgressBar from './ProgressBar.jsx';
 /**
  * Deck manager for flashcards.
  * Handles card flipping, pagination, navigation, restart, and keyboard shortcuts.
+ *
  * @param {object} props
- * @param {object} props.data { type: 'flashcards', title: string, cards: Array<{ id, question, answer }> }
+ * @param {object} props.data
  * @param {function} [props.onResetAll] Optional full app reset
  */
 export default function FlashcardDeck({ data, onResetAll }) {
   const initialCards = data?.cards || [];
+
   const [cards, setCards] = useState(initialCards);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -35,6 +37,7 @@ export default function FlashcardDeck({ data, onResetAll }) {
   const currentCard = cards[currentIndex];
   const totalCards = cards.length;
 
+  // Go to next card
   const handleNext = useCallback(() => {
     if (currentIndex < totalCards - 1) {
       setIsFlipped(false);
@@ -42,6 +45,7 @@ export default function FlashcardDeck({ data, onResetAll }) {
     }
   }, [currentIndex, totalCards]);
 
+  // Go to previous card
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
       setIsFlipped(false);
@@ -49,97 +53,159 @@ export default function FlashcardDeck({ data, onResetAll }) {
     }
   }, [currentIndex]);
 
-  const handleRestart = () => {
+  // Restart deck
+  const handleRestart = useCallback(() => {
     setCurrentIndex(0);
     setIsFlipped(false);
     setMasteredIds(new Set());
-  };
+  }, []);
 
-  const handleShuffle = () => {
+  // Shuffle cards
+  const handleShuffle = useCallback(() => {
     const shuffled = [...cards].sort(() => Math.random() - 0.5);
+
     setCards(shuffled);
     setCurrentIndex(0);
     setIsFlipped(false);
-  };
+  }, [cards]);
 
-  const handleToggleMastered = () => {
+  // Mark / unmark current card as mastered
+  const handleToggleMastered = useCallback(() => {
     if (!currentCard) return;
+
     setMasteredIds(prev => {
       const next = new Set(prev);
+
       if (next.has(currentCard.id)) {
         next.delete(currentCard.id);
       } else {
         next.add(currentCard.id);
       }
+
       return next;
     });
-  };
+  }, [currentCard]);
 
-  // Keyboard navigation shortcuts
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Avoid stealing keystrokes if focused inside an input/textarea
-      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      // Do not capture keyboard shortcuts when user is typing
+      if (
+        e.target.tagName === 'INPUT' ||
+        e.target.tagName === 'TEXTAREA' ||
+        e.target.isContentEditable
+      ) {
+        return;
+      }
 
-      if (e.key === 'ArrowRight') {
-        handleNext();
-      } else if (e.key === 'ArrowLeft') {
-        handlePrev();
-      } else if (e.key === 'r' || e.key === 'R') {
-        setIsFlipped(prev => !prev);
+      switch (e.key) {
+        // Previous card
+        case 'ArrowLeft':
+          e.preventDefault();
+          handlePrev();
+          break;
+
+        // Next card
+        case 'ArrowRight':
+          e.preventDefault();
+          handleNext();
+          break;
+
+        // Flip card
+        case ' ':
+        case 'Enter':
+          e.preventDefault();
+          setIsFlipped(prev => !prev);
+          break;
+
+        // Restart
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          handleRestart();
+          break;
+
+        default:
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleNext, handlePrev]);
 
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleNext, handlePrev, handleRestart]);
+
+  // Empty state
   if (!cards || cards.length === 0) {
     return (
       <div className="empty-deck">
         <p>No flashcards available in this deck.</p>
+
+        {onResetAll && (
+          <button
+            type="button"
+            className="action-pill-btn"
+            onClick={onResetAll}
+          >
+            Create New Deck
+          </button>
+        )}
       </div>
     );
   }
 
-  const isCurrentMastered = currentCard ? masteredIds.has(currentCard.id) : false;
+  const isCurrentMastered = currentCard
+    ? masteredIds.has(currentCard.id)
+    : false;
 
   return (
-    <section className="flashcard-deck-section" aria-label="Flashcard Study Session">
+    <section
+      className="flashcard-deck-section"
+      aria-label="Flashcard Study Session"
+    >
       {/* Deck Header */}
       <div className="deck-header">
         <div className="deck-title-row">
           <div className="deck-badge">
-            <Layers size={16} /> Flashcard Deck
+            <Layers size={16} />
+            Flashcard Deck
           </div>
-          <h2 className="deck-title">{data.title}</h2>
+
+          <h2 className="deck-title">
+            {data?.title || 'Flashcard Deck'}
+          </h2>
         </div>
 
         <div className="deck-quick-actions">
-          <button 
-            type="button" 
-            className="action-pill-btn" 
+          <button
+            type="button"
+            className="action-pill-btn"
             onClick={handleShuffle}
             title="Shuffle card order"
           >
-            <Shuffle size={14} /> Shuffle
+            <Shuffle size={14} />
+            Shuffle
           </button>
-          <button 
-            type="button" 
-            className="action-pill-btn" 
+
+          <button
+            type="button"
+            className="action-pill-btn"
             onClick={handleRestart}
             title="Restart session from card 1"
           >
-            <RotateCcw size={14} /> Restart
+            <RotateCcw size={14} />
+            Restart
           </button>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <ProgressBar 
-        current={currentIndex + 1} 
-        total={totalCards} 
-        label="Deck Progress" 
+      <ProgressBar
+        current={currentIndex + 1}
+        total={totalCards}
+        label="Deck Progress"
       />
 
       {/* Main Flashcard Display */}
@@ -154,6 +220,7 @@ export default function FlashcardDeck({ data, onResetAll }) {
 
       {/* Controls & Pagination Bar */}
       <div className="deck-controls-bar">
+        {/* Previous */}
         <button
           type="button"
           className="nav-btn prev-btn"
@@ -165,21 +232,35 @@ export default function FlashcardDeck({ data, onResetAll }) {
           <span>Previous</span>
         </button>
 
+        {/* Center Actions */}
         <div className="deck-center-actions">
           <button
             type="button"
-            className={`master-toggle-btn ${isCurrentMastered ? 'mastered' : ''}`}
+            className={`master-toggle-btn ${
+              isCurrentMastered ? 'mastered' : ''
+            }`}
             onClick={handleToggleMastered}
-            title={isCurrentMastered ? "Mark as unmastered" : "Mark as mastered"}
+            title={
+              isCurrentMastered
+                ? 'Mark as unmastered'
+                : 'Mark as mastered'
+            }
           >
             <Check size={16} />
-            <span>{isCurrentMastered ? 'Mastered' : 'Mark Mastered'}</span>
+
+            <span>
+              {isCurrentMastered
+                ? 'Mastered'
+                : 'Mark Mastered'}
+            </span>
           </button>
+
           <span className="card-counter-tag">
             Card {currentIndex + 1} of {totalCards}
           </span>
         </div>
 
+        {/* Next */}
         <button
           type="button"
           className="nav-btn next-btn"
@@ -194,9 +275,21 @@ export default function FlashcardDeck({ data, onResetAll }) {
 
       {/* Keyboard Shortcut Hints */}
       <div className="keyboard-shortcuts-guide">
-        <span className="shortcut-item"><kbd>&larr;</kbd> Previous</span>
-        <span className="shortcut-item"><kbd>&rarr;</kbd> Next</span>
-        <span className="shortcut-item"><kbd>Space</kbd> / <kbd>Enter</kbd> Flip</span>
+        <span className="shortcut-item">
+          <kbd>&larr;</kbd> Previous
+        </span>
+
+        <span className="shortcut-item">
+          <kbd>&rarr;</kbd> Next
+        </span>
+
+        <span className="shortcut-item">
+          <kbd>Space</kbd> / <kbd>Enter</kbd> Flip
+        </span>
+
+        <span className="shortcut-item">
+          <kbd>R</kbd> Restart
+        </span>
       </div>
     </section>
   );
