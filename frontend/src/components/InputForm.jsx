@@ -1,46 +1,63 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { BookOpen, Sparkles, HelpCircle, ArrowRight } from 'lucide-react';
 
 const SAMPLE_TOPICS = [
   {
     title: 'React Hooks Lifecycle',
-    snippet: 'Explain useState, useEffect dependencies, useRef mutations, and cleanups in React.'
+    snippet:
+      'Explain useState, useEffect dependencies, useRef mutations, and cleanups in React.'
   },
   {
     title: 'TCP vs UDP Protocols',
-    snippet: 'Compare TCP connection handshake and reliability with UDP low-latency connectionless datagrams.'
+    snippet:
+      'Compare TCP connection handshake and reliability with UDP low-latency connectionless datagrams.'
   },
   {
     title: 'Photosynthesis Stages',
-    snippet: 'Light-dependent reactions in thylakoid membranes and the Calvin cycle light-independent carbon fixation.'
+    snippet:
+      'Light-dependent reactions in thylakoid membranes and the Calvin cycle light-independent carbon fixation.'
   },
   {
     title: 'REST vs GraphQL',
-    snippet: 'Key architectural differences, over-fetching vs under-fetching, endpoint design, and caching tradeoffs.'
+    snippet:
+      'Key architectural differences, over-fetching vs under-fetching, endpoint design, and caching tradeoffs.'
   }
 ];
 
-export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcards' }) {
+export default function InputForm({
+  onSubmit,
+  isLoading,
+  initialMode = 'flashcards'
+}) {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState(initialMode);
   const [validationError, setValidationError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const trimmed = input.trim();
+
     const trimmed = input.trim();
 
+    // Empty input or only spaces
     if (!trimmed) {
-        setValidationError('Please enter a question.');
-        return;
+      setValidationError('Please enter a question.');
+      return;
     }
 
+    // Input shorter than 3 characters
     if (trimmed.length < 3) {
-        setValidationError('Please enter at least 3 characters.');
-        return;
+      setValidationError('Please enter at least 3 characters.');
+      return;
     }
+
+    // Clear previous validation error
     setValidationError('');
-    onSubmit({ mode, input: trimmed });
+
+    // Send valid input to parent
+    onSubmit({
+      mode,
+      input: trimmed
+    });
   };
 
   const handleSelectSample = (sample) => {
@@ -51,37 +68,63 @@ export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcar
   return (
     <div className="input-card">
       <form onSubmit={handleSubmit} className="study-form">
+
         {/* Mode Selector */}
         <div className="mode-selector-group">
-          <label className="section-label">1. Choose Study Format</label>
-          <div className="mode-tabs" role="tablist" aria-label="Study Format">
+          <label className="section-label">
+            1. Choose Study Format
+          </label>
+
+          <div
+            className="mode-tabs"
+            role="tablist"
+            aria-label="Study Format"
+          >
+            {/* Flashcards */}
             <button
               type="button"
               role="tab"
               aria-selected={mode === 'flashcards'}
-              className={`mode-btn ${mode === 'flashcards' ? 'active' : ''}`}
+              className={`mode-btn ${
+                mode === 'flashcards' ? 'active' : ''
+              }`}
               onClick={() => setMode('flashcards')}
               disabled={isLoading}
             >
               <BookOpen className="icon" size={18} />
+
               <div className="mode-text">
-                <span className="mode-title">Flashcards</span>
-                <span className="mode-desc">Active recall flip cards</span>
+                <span className="mode-title">
+                  Flashcards
+                </span>
+
+                <span className="mode-desc">
+                  Active recall flip cards
+                </span>
               </div>
             </button>
 
+            {/* Quiz */}
             <button
               type="button"
               role="tab"
               aria-selected={mode === 'quiz'}
-              className={`mode-btn ${mode === 'quiz' ? 'active' : ''}`}
+              className={`mode-btn ${
+                mode === 'quiz' ? 'active' : ''
+              }`}
               onClick={() => setMode('quiz')}
               disabled={isLoading}
             >
               <HelpCircle className="icon" size={18} />
+
               <div className="mode-text">
-                <span className="mode-title">Quiz</span>
-                <span className="mode-desc">Multiple-choice test</span>
+                <span className="mode-title">
+                  Quiz
+                </span>
+
+                <span className="mode-desc">
+                  Multiple-choice test
+                </span>
               </div>
             </button>
           </div>
@@ -90,27 +133,42 @@ export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcar
         {/* Input Textarea */}
         <div className="input-group">
           <div className="input-label-row">
-            <label htmlFor="study-input" className="section-label">
+            <label
+              htmlFor="study-input"
+              className="section-label"
+            >
               2. Enter Topic or Paste Notes
             </label>
-            <span className="char-count">{input.length} characters</span>
+
+            <span className="char-count">
+              {input.length} characters
+            </span>
           </div>
 
           <textarea
             id="study-input"
             rows={5}
-            className={`study-textarea ${validationError ? 'has-error' : ''}`}
+            className={`study-textarea ${
+              validationError ? 'has-error' : ''
+            }`}
             placeholder="e.g. Paste notes on binary search trees, or type 'Kubernetes Pod lifecycle and scheduling'..."
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
-              if (validationError) setValidationError('');
+
+              if (validationError) {
+                setValidationError('');
+              }
             }}
             disabled={isLoading}
           />
 
+          {/* Validation Error */}
           {validationError && (
-            <p className="field-error-text" role="alert">
+            <p
+              className="field-error-text"
+              role="alert"
+            >
               {validationError}
             </p>
           )}
@@ -118,7 +176,10 @@ export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcar
 
         {/* Starter Topic Chips */}
         <div className="sample-prompts-container">
-          <span className="sample-label">Quick Suggestions:</span>
+          <span className="sample-label">
+            Quick Suggestions:
+          </span>
+
           <div className="sample-chips">
             {SAMPLE_TOPICS.map((sample) => (
               <button
@@ -142,14 +203,33 @@ export default function InputForm({ onSubmit, isLoading, initialMode = 'flashcar
         >
           {isLoading ? (
             <>
-              <span className="spinner-sm" aria-hidden="true" />
-              <span>Synthesizing with Gemini...</span>
+              <span
+                className="spinner-sm"
+                aria-hidden="true"
+              />
+
+              <span>
+                Synthesizing with Gemini...
+              </span>
             </>
           ) : (
             <>
-              <Sparkles className="icon" size={18} />
-              <span>Generate {mode === 'flashcards' ? 'Flashcards' : 'Quiz'}</span>
-              <ArrowRight className="icon-end" size={16} />
+              <Sparkles
+                className="icon"
+                size={18}
+              />
+
+              <span>
+                Generate{' '}
+                {mode === 'flashcards'
+                  ? 'Flashcards'
+                  : 'Quiz'}
+              </span>
+
+              <ArrowRight
+                className="icon-end"
+                size={16}
+              />
             </>
           )}
         </button>
